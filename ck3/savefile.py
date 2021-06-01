@@ -80,13 +80,16 @@ class FormatError(Exception):
         return s
 
 class SaveFile:
-    def __init__(self):
+    def __init__(self, scanner=None):
         self.clear()
+        if scanner is None:
+            self.scanner = DefaultScanner()
+        else:
+            self.scanner = scanner
 
     def clear(self):
         self.name = None
         self.pathname = None
-        self.scanner = self
 
     def load(self, name):
         if os.path.dirname(name):
@@ -139,9 +142,8 @@ class SaveFile:
                     continue
                 else:
                     # process previous token
-                    elem = Value(ScanElementType.Value, tuple(scopestack), tokens[0])
+                    self.scanner.value(tokens[0], tuple(scopestack))
                     tokens = []
-                    self.scanner.scan_element(elem)
             # deliberate fallthrough after previous token is processed
 
             if len(tokens) == 0:
@@ -149,32 +151,53 @@ class SaveFile:
                     tokens.append(token)
                     continue
                 elif token.ttype == TokenType.QuotedString:
-                    elem = Value(ScanElementType.Value, tuple(scopestack), token)
+                    self.scanner.value(token, tuple(scopestack))
                 elif token.ttype == TokenType.Close:
                     if not scopestack:
                         raise FormatError('unmatched }',
                                           name=self.name, line=token.line)
-                    elem = CloseScope(ScanElementType.CloseScope, tuple(scopestack))
+                    self.scanner.close_scope(tuple(scopestack))
                     scopestack.pop()
                 elif token.ttype == TokenType.Open:
                     # Start of anonymous scope
-                    elem = OpenScope(ScanElementType.OpenScope, tuple(scopestack), None)
+                    self.scanner.open_scope(None, tuple(scopestack))
                     scopestack.append('')
                 else:
                     raise self.__unexpected_token(token)
             elif len(tokens) == 2:
                 if token.ttype == TokenType.Open:
-                    elem = OpenScope(ScanElementType.OpenScope, tuple(scopestack), token)
+                    self.scanner.open_scope(tokens[0], tuple(scopestack))
                     scopestack.append(tokens[0].value)
                 elif token.ttype in (TokenType.Date, TokenType.Number, TokenType.BareString, TokenType.QuotedString):
-                    elem = Assign(ScanElementType.Assign, tuple(scopestack), tokens[0], token)
+                    self.scanner.assign(tokens[0], token, tuple(scopestack))
                 else:
                     raise self.__unexpected_token(token)
                 tokens = []
             else:
                 tokens = []
                 raise self.__unexpected_token(token)
-            self.scanner.scan_element(elem)
+        if len(tokens) > 0:
+            raise FormatError('leftover tokens at end', name=self.name)
+        self.scanner.done()
 
-    def scan_element(self, elem):
+class ScannerBase:
+    def set_name(self, name):
+        self.name = name
+
+    def open_scope(self, name, scope):
         pass
+
+    def close_scope(self, scope):
+        pass
+
+    def assign(self, key, value, scope):
+        pass
+
+    def value(self, value, scope):
+        pass
+
+    def done(self):
+        pass
+
+class DefaultScanner(ScannerBase):
+    pass
