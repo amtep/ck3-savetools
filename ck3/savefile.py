@@ -6,6 +6,8 @@ from collections import namedtuple
 from enum import Enum, auto
 from zipfile import ZipFile, BadZipFile
 
+from ck3.date import Date
+
 # TODO add paths for other systems
 CK3_SAVEFILE_DIRS = [
     '~/.local/share/Paradox Interactive/Crusader Kings III/save games/',
@@ -57,6 +59,8 @@ def tokenize(f):
             if m.lastgroup == 'QuotedString':
                 # strip the quotes
                 value = line[m.start()+1:m.end()-1]
+            elif m.lastgroup == 'Date':
+                value = Date(line[m.start():m.end()])
             else:
                 value = line[m.start():m.end()]
             ttype = TokenType[m.lastgroup]
