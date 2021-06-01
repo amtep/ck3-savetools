@@ -23,5 +23,16 @@ class Date:
             return NotImplemented
         return self.d <= odate.d
 
+    def __eq__(self, odate):
+        if not isinstance(odate, Date):
+            return NotImplemented
+        return self.d == odate.d
+
     def __str__(self):
         return '.'.join(self.d)
+
+    def age(self, current):
+        age = current.d[0] - self.d[0]
+        if current.d[1] < self.d[1] or (current.d[1] == self.d[1] and current.d[2] < self.d[2]):
+            age -= 1
+        return age

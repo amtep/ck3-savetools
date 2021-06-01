@@ -6,6 +6,7 @@ from collections import namedtuple
 from enum import Enum, auto
 from zipfile import ZipFile, BadZipFile
 
+from ck3.character import Character
 from ck3.date import Date
 
 # TODO add paths for other systems
@@ -24,17 +25,6 @@ class TokenType(Enum):
     QuotedString = auto()
 
 Token = namedtuple('Token', ('ttype', 'value', 'line'))
-
-class ScanElementType(Enum):
-    OpenScope = auto()
-    CloseScope = auto()
-    Assign = auto()
-    Value = auto()
-
-OpenScope = namedtuple('OpenScope', ('etype', 'scope', 'key'))
-CloseScope = namedtuple('CloseScope', ('etype', 'scope'))
-Assign = namedtuple('Assign', ('etype', 'scope', 'key', 'value'))
-Value = namedtuple('Value', ('etype', 'scope', 'value'))
 
 tokenRE = re.compile(r"""
 (?P<WS>\s+) |
@@ -56,15 +46,19 @@ def tokenize(f):
             # The logic here relies on there being only one matching group
             if m.lastgroup == 'WS':
                 continue
+            text = line[m.start():m.end()]
             if m.lastgroup == 'QuotedString':
                 # strip the quotes
-                value = line[m.start()+1:m.end()-1]
+                value = text[1:-1]
             elif m.lastgroup == 'Date':
-                value = Date(line[m.start():m.end()])
+                value = Date(text)
             elif m.lastgroup == 'Number':
-                value = float(line[m.start():m.end()])
+                if '.' in text:
+                    value = float(text)
+                else:
+                    value = int(text)
             else:
-                value = line[m.start():m.end()]
+                value = text
             ttype = TokenType[m.lastgroup]
             yield Token(ttype, value, lineno)
 
@@ -206,4 +200,45 @@ class ScannerBase:
         pass
 
 class DefaultScanner(ScannerBase):
-    pass
+    def __init__(self):
+        self.characters = {}
+        self.date = None
+        self.building = None
+        self.build_scope = None
+
+    def set_name(self, name):
+        self.name = name
+
+    def open_scope(self, name, scope):
+        if scope == ('living', ) or scope == ('dead_unprunable', ) or scope == ('characters', 'dead_prunable'):
+            if name.ttype == TokenType.Number:
+                if name.value in self.characters:
+                    print("Duplicate character id %d" % name.value)
+                else:
+                    self.building = Character(name.value)
+                    self.build_scope = scope + (name.value, )
+                    self.characters[name.value] = self.building
+
+    def close_scope(self, scope):
+        if scope == self.build_scope:
+            self.building = None
+            self.build_scope = None
+
+    def assign(self, key, value, scope):
+        if scope == () and key.value == 'date':
+            self.date = value.value
+
+        if not self.build_scope:
+            return
+        if scope[:len(self.build_scope)] != self.build_scope:
+            return
+        keystr = '/'.join(str(s) for s in scope[len(self.build_scope):] + (key.value, ))
+        self.building.assign(keystr, value)
+
+    def value(self, value, scope):
+        if not self.build_scope:
+            return
+        if scope[:len(self.build_scope)] != self.build_scope:
+            return
+        keystr = '/'.join(str(s) for s in scope[len(self.build_scope):])
+        self.building.value(keystr, value)
