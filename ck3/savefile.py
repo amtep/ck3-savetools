@@ -39,29 +39,30 @@ def tokenize(f):
     lineno = 0
     for line in f:
         lineno += 1
-        pos = 0
-        while pos < len(line):
-            m = tokenRE.match(line, pos)
-            pos = m.end()
-            if m.group('WS'):
+        for m in tokenRE.finditer(line):
+            # The logic here relies on there being only one matching group
+            if m.lastgroup == 'WS':
                 continue
-            if m.group('QuotedString'):
+            if m.lastgroup == 'QuotedString':
                 # strip the quotes
-                value = line[m.start()+1:m.end('QuotedString')-1]
+                value = line[m.start()+1:m.end()-1]
             else:
                 value = line[m.start():m.end()]
             ttype = TokenType[m.lastgroup]
             yield Token(ttype, value, lineno)
 
 class FormatError(Exception):
-    def __init__(self, msg, savename=None):
+    def __init__(self, msg, savename=None, line=None):
         self.msg = msg
         self.savename = savename
+        self.line = line
 
     def __str__(self):
         s = ''
         if self.savename:
             s += self.savename + ':'
+        if self.line is not None:
+            s += str(self.line) + ':'
         if s:
             s += ' '
         s += self.msg
@@ -108,4 +109,4 @@ class SaveFile:
     def __load_from(self, f):
         for ttype, value, lineno in tokenize(f):
             if ttype == TokenType.Error:
-                print((ttype, value, lineno))
+                raise FormatError('Unexpected character: ' + value, savename=self.name, line=lineno)
