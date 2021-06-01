@@ -61,6 +61,8 @@ def tokenize(f):
                 value = line[m.start()+1:m.end()-1]
             elif m.lastgroup == 'Date':
                 value = Date(line[m.start():m.end()])
+            elif m.lastgroup == 'Number':
+                value = float(line[m.start():m.end()])
             else:
                 value = line[m.start():m.end()]
             ttype = TokenType[m.lastgroup]
