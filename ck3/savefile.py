@@ -23,6 +23,17 @@ class TokenType(Enum):
 
 Token = namedtuple('Token', ('ttype', 'value', 'line'))
 
+class ScanElementType(Enum):
+    OpenScope = auto()
+    CloseScope = auto()
+    Assign = auto()
+    Value = auto()
+
+OpenScope = namedtuple('OpenScope', ('etype', 'scope', 'key'))
+CloseScope = namedtuple('CloseScope', ('etype', 'scope'))
+Assign = namedtuple('Assign', ('etype', 'scope', 'key', 'value'))
+Value = namedtuple('Value', ('etype', 'scope', 'value'))
+
 tokenRE = re.compile(r"""
 (?P<WS>\s+) |
 (?P<Eq>=) |
@@ -52,15 +63,15 @@ def tokenize(f):
             yield Token(ttype, value, lineno)
 
 class FormatError(Exception):
-    def __init__(self, msg, savename=None, line=None):
+    def __init__(self, msg, name=None, line=None):
         self.msg = msg
-        self.savename = savename
+        self.name = name
         self.line = line
 
     def __str__(self):
         s = ''
-        if self.savename:
-            s += self.savename + ':'
+        if self.name:
+            s += self.name + ':'
         if self.line is not None:
             s += str(self.line) + ':'
         if s:
@@ -75,6 +86,7 @@ class SaveFile:
     def clear(self):
         self.name = None
         self.pathname = None
+        self.scanner = self
 
     def load(self, name):
         if os.path.dirname(name):
@@ -93,6 +105,7 @@ class SaveFile:
         raise OSError("Savefile not found")
 
     def load_pathname(self, pathname):
+        self.clear()
         self.pathname = pathname
         self.name = os.path.splitext(os.path.basename(pathname))[0]
         try:
@@ -103,10 +116,65 @@ class SaveFile:
             with open(pathname, 'rt', encoding='utf-8') as infile:
                 checksum = f.readline()
                 if not checksum.startswith("SAV"):
-                    raise FormatError("Not a savefile", savename=self.pathname)
+                    raise FormatError("Not a savefile", name=self.pathname)
                 self.__load_from(infile)
 
+    def __unexpected_token(self, token):
+        return FormatError('unexpected %s token' % token.ttype.name,
+                           name=self.name, line=token.line)
+
     def __load_from(self, f):
-        for ttype, value, lineno in tokenize(f):
-            if ttype == TokenType.Error:
-                raise FormatError('Unexpected character: ' + value, savename=self.name, line=lineno)
+        if hasattr(self.scanner, 'set_name'):
+            self.scanner.set_name(self.name)
+        scopestack = []
+        tokens = []
+        for token in tokenize(f):
+            if token.ttype == TokenType.Error:
+                raise FormatError('unexpected character "%s"' % token.value,
+                                  name=self.name, line=token.line)
+
+            if len(tokens) == 1:
+                if token.ttype == TokenType.Eq:
+                    tokens.append(token)
+                    continue
+                else:
+                    # process previous token
+                    elem = Value(ScanElementType.Value, tuple(scopestack), tokens[0])
+                    tokens = []
+                    self.scanner.scan_element(elem)
+            # deliberate fallthrough after previous token is processed
+
+            if len(tokens) == 0:
+                if token.ttype in (TokenType.Date, TokenType.Number, TokenType.BareString):
+                    tokens.append(token)
+                    continue
+                elif token.ttype == TokenType.QuotedString:
+                    elem = Value(ScanElementType.Value, tuple(scopestack), token)
+                elif token.ttype == TokenType.Close:
+                    if not scopestack:
+                        raise FormatError('unmatched }',
+                                          name=self.name, line=token.line)
+                    elem = CloseScope(ScanElementType.CloseScope, tuple(scopestack))
+                    scopestack.pop()
+                elif token.ttype == TokenType.Open:
+                    # Start of anonymous scope
+                    elem = OpenScope(ScanElementType.OpenScope, tuple(scopestack), None)
+                    scopestack.append('')
+                else:
+                    raise self.__unexpected_token(token)
+            elif len(tokens) == 2:
+                if token.ttype == TokenType.Open:
+                    elem = OpenScope(ScanElementType.OpenScope, tuple(scopestack), token)
+                    scopestack.append(tokens[0].value)
+                elif token.ttype in (TokenType.Date, TokenType.Number, TokenType.BareString, TokenType.QuotedString):
+                    elem = Assign(ScanElementType.Assign, tuple(scopestack), tokens[0], token)
+                else:
+                    raise self.__unexpected_token(token)
+                tokens = []
+            else:
+                tokens = []
+                raise self.__unexpected_token(token)
+            self.scanner.scan_element(elem)
+
+    def scan_element(self, elem):
+        pass
