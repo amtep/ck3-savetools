@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+
+import sys
+
+from ck3.savefile import SaveFile, FormatError
+
+def usage():
+    print("Usage: %s SAVENAME" % sys.argv[0], file=sys.stderr)
+    sys.exit(1)
+
+def fail(*args):
+    print(*args, file=sys.stderr)
+    sys.exit(1)
+
+def main():
+    if len(sys.argv) != 2:
+        usage()
+    savename = sys.argv[1]
+    savefile = SaveFile()
+    try:
+        savefile.load(savename)
+    except OSError as e:
+        fail(e)
+    except FormatError as e:
+        fail(e)
+
+if __name__ == "__main__":
+    main()
