@@ -8,6 +8,8 @@ from zipfile import ZipFile, BadZipFile
 
 from ck3.character import Character
 from ck3.date import Date
+from ck3.gamestate import GameState
+from ck3.title import Title
 
 # TODO add paths for other systems
 CK3_SAVEFILE_DIRS = [
@@ -201,8 +203,7 @@ class ScannerBase:
 
 class DefaultScanner(ScannerBase):
     def __init__(self):
-        self.characters = {}
-        self.date = None
+        self.state = GameState()
         self.building = None
         self.build_scope = None
 
@@ -212,12 +213,20 @@ class DefaultScanner(ScannerBase):
     def open_scope(self, name, scope):
         if scope == ('living', ) or scope == ('dead_unprunable', ) or scope == ('characters', 'dead_prunable'):
             if name.ttype == TokenType.Number:
-                if name.value in self.characters:
+                if name.value in self.state.characters:
                     print("Duplicate character id %d" % name.value)
                 else:
-                    self.building = Character(name.value)
+                    self.building = Character(name.value, self.state)
                     self.build_scope = scope + (name.value, )
-                    self.characters[name.value] = self.building
+                    self.state.characters[name.value] = self.building
+        elif scope == ('landed_titles', 'landed_titles'):
+            if name.ttype == TokenType.Number:
+                if name.value in self.state.titles:
+                    print("Duplicate title id %d" % name.value)
+                else:
+                    self.building = Title(name.value, self.state)
+                    self.build_scope = scope + (name.value, )
+                    self.state.titles[name.value] = self.building
 
     def close_scope(self, scope):
         if scope == self.build_scope:
@@ -226,7 +235,7 @@ class DefaultScanner(ScannerBase):
 
     def assign(self, key, value, scope):
         if scope == () and key.value == 'date':
-            self.date = value.value
+            self.state.date = value.value
 
         if not self.build_scope:
             return
