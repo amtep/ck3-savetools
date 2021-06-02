@@ -29,7 +29,7 @@ class Date:
         return self.d == odate.d
 
     def __str__(self):
-        return '.'.join(self.d)
+        return "%d.%d.%d" % self.d
 
     def age(self, current):
         age = current.d[0] - self.d[0]
