@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+
+import sys
+
+from ck3.date import Date
+from ck3.savefile import SaveFile, FormatError, TokenType
+from ck3.title import Title, Rank
+
+def usage():
+    print("Usage: %s SAVENAME" % sys.argv[0], file=sys.stderr)
+    sys.exit(1)
+
+def fail(*args):
+    print(*args, file=sys.stderr)
+    sys.exit(1)
+
+def main():
+    if len(sys.argv) != 2:
+        usage()
+    savename = sys.argv[1]
+    savefile = SaveFile()
+    try:
+        savefile.load(savename)
+    except OSError as e:
+        fail(e)
+    except FormatError as e:
+        fail(e)
+
+    state = savefile.scanner.state
+    print("%d people" % len(state.characters))
+
+    # Note: the has_cheated_flag is set by a personal mod called CheatDetector.
+    # It's not part of the base game.
+    living = 0
+    living_ruler_spouses = 0
+    living_ruler_children = 0
+    living_ruler_siblings = 0
+    living_rulers = 0
+    living_cheated = 0
+    living_rulers_cheated = 0
+    living_ruler_spouses_cheated = 0
+    living_ruler_children_cheated = 0
+    living_ruler_siblings_cheated = 0
+    ruler_children_set = set()
+    for c in state.characters.values():
+        for child in c.children():
+            for c_id in c.child_ids:
+                if c_id not in child.siblings:
+                    child.siblings.append(c_id)
+        if c.alive():
+            living += 1
+            if "has_cheated_flag" in c.flags:
+                living_cheated += 1
+            if c.landed() and c.rank() > Rank.Barony:
+                living_rulers += 1
+                if "has_cheated_flag" in c.flags:
+                    living_rulers_cheated += 1
+                for child in c.child_ids:
+                    if child in state.characters:
+                        ruler_children_set.add(child)
+            if c.primary_spouse_id:
+                spouse = state.characters[c.primary_spouse_id]
+                if spouse.landed() and spouse.rank() > Rank.Barony:
+                    living_ruler_spouses += 1
+                    if "has_cheated_flag" in c.flags:
+                        living_ruler_spouses_cheated += 1
+
+    for child_id in ruler_children_set:
+        c = state.characters[child_id]
+        if not c.alive():
+            continue
+        if c.age(state.date) < 16:
+            continue
+        living_ruler_children += 1
+        if "has_cheated_flag" in c.flags:
+            living_ruler_children_cheated += 1
+
+    for c in state.characters.values():
+        if not c.alive():
+            continue
+        if c.age(state.date) < 16:
+            continue
+        for s_id in c.siblings:
+            s = state.characters[s_id]
+            if s.alive() and s.landed() and s.rank() > Rank.Barony:
+                break
+        else:
+            continue
+        living_ruler_siblings += 1
+        if "has_cheated_flag" in c.flags:
+            living_ruler_siblings_cheated += 1
+        
+    print("%d living" % living)
+    print("%d living cheated" % living_cheated)
+    print("%d living rulers" % living_rulers)
+    print("%d living rulers cheated" % living_rulers_cheated)
+    print("%d living rulers' spouses" % living_ruler_spouses)
+    print("%d living rulers' spouses cheated" % living_ruler_spouses_cheated)
+    print("%d living rulers' children" % living_ruler_children)
+    print("%d living rulers' children cheated" % living_ruler_children_cheated)
+    print("%d living rulers' siblings" % living_ruler_siblings)
+    print("%d living rulers' siblings cheated" % living_ruler_siblings_cheated)
+
+if __name__ == "__main__":
+    main()
