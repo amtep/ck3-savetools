@@ -36,14 +36,33 @@ tokenRE = re.compile(r"""
 (?P<Date>\d+[.] \d+[.] \d+) |
 (?P<Number>-?\d+[.]?\d* | -?[.]\d+) |
 (?P<BareString>[\w.:_] [\d\w.:_-]*) |
-(?P<QuotedString>"[^"]*") |
+(?P<QuotedString>"(?:[^"\\] | \\")*") |
+(?P<PartialString>"(?:[^"\\] | \\")*) |
 (?P<Error>.)
+""", re.VERBOSE | re.ASCII)
+
+continuationRE = re.compile(r"""
+(?P<PartialStringEnd>(?:[^"\\] | \\")*") |
+(?P<PartialString>.*) |
 """, re.VERBOSE | re.ASCII)
 
 def tokenize(f):
     lineno = 0
+    partialstring = ''
     for line in f:
         lineno += 1
+        if partialstring:
+            m = continuationRE.match(line)
+            text = line[m.start():m.end()]
+            if m.lastgroup == 'PartialStringEnd':
+                partialstring += text[:-1]
+                ttype = TokenType.QuotedString
+                yield Token(ttype, partialstring, lineno)
+                partialstring = ''
+                line = line[m.end():]
+            elif m.lastgroup == 'PartialString':
+                partialstring += text + '\n'
+                continue
         for m in tokenRE.finditer(line):
             # The logic here relies on there being only one matching group
             if m.lastgroup == 'WS':
@@ -59,6 +78,9 @@ def tokenize(f):
                     value = float(text)
                 else:
                     value = int(text)
+            elif m.lastgroup == 'PartialString':
+                partialstring = text[1:] + '\n'
+                break
             else:
                 value = text
             ttype = TokenType[m.lastgroup]
@@ -119,9 +141,10 @@ class SaveFile:
                 self.__load_from(io.TextIOWrapper(infile, encoding='utf-8'))
         except BadZipFile:
             with open(pathname, 'rt', encoding='utf-8') as infile:
-                checksum = f.readline()
-                if not checksum.startswith("SAV"):
+                checksum = infile.readline()
+                if not checksum.startswith("SAV") and not checksum.startswith("meta_data={"):
                     raise FormatError("Not a savefile", name=self.pathname)
+                infile.seek(0)
                 self.__load_from(infile)
 
     def __unexpected_token(self, token):
