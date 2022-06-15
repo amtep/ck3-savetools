@@ -43,6 +43,8 @@ class Character:
         return self.death_date is None
 
     def age(self, current):
+        if self.birth_date is None:
+            raise ValueError("Character %d has no birth date" % self.id)
         return self.birth_date.age(current)
 
     def titles(self):
