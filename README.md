@@ -6,4 +6,4 @@ This repository just provides the savefile scanning code. It's a base for develo
 
 It does NOT handle Ironman saves. Reading those requires a bit of secret Paradox information that I don't want to publish here.
 
-The Python is pretty slow (about a minute to scan one savefile), but runninh it under pypy3 makes it only take a few seconds.
+The Python is pretty slow (about a minute to scan one savefile), but running it under pypy3 makes it only take a few seconds.
