@@ -44,6 +44,7 @@ def main():
     living_ruler_spouses_cheated = 0
     living_ruler_children_cheated = 0
     living_ruler_siblings_cheated = 0
+    living_ruler_children_bastards = 0
     ruler_children_set = set()
     for c in state.characters.values():
         for child in c.children():
@@ -77,6 +78,8 @@ def main():
         living_ruler_children += 1
         if flagname in c.flags:
             living_ruler_children_cheated += 1
+        if c.real_father_id is not None:
+            living_ruler_children_bastards += 1
 
     for c in state.characters.values():
         if not c.alive():
@@ -101,6 +104,7 @@ def main():
     print("%d living rulers' spouses cheated" % living_ruler_spouses_cheated)
     print("%d living rulers' children" % living_ruler_children)
     print("%d living rulers' children cheated" % living_ruler_children_cheated)
+    print("%d living rulers' children have different father" % living_ruler_children_bastards)
     print("%d living rulers' siblings" % living_ruler_siblings)
     print("%d living rulers' siblings cheated" % living_ruler_siblings_cheated)
 

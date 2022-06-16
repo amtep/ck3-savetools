@@ -68,3 +68,10 @@ class Character:
             if c.real_father_id == self.id and c not in children:
                 children.append(c)
         return children
+
+    def real_father(self):
+        if self.real_father_id is None:
+            return None
+        if self.real_father_id not in self.state.characters:
+            return None
+        return self.state.characters[self.real_father_id]
