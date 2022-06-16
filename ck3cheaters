@@ -29,8 +29,11 @@ def main():
     state = savefile.scanner.state
     print("%d people" % len(state.characters))
 
-    # Note: the has_cheated_flag is set by a personal mod called CheatDetector.
+    # Note: the flag is set by a personal mod called CheatDetector.
     # It's not part of the base game.
+    #flagname = "has_fornicated_flag"
+    flagname = "has_cheated_flag"
+
     living = 0
     living_ruler_spouses = 0
     living_ruler_children = 0
@@ -49,11 +52,11 @@ def main():
                     child.siblings.append(c_id)
         if c.alive():
             living += 1
-            if "has_cheated_flag" in c.flags:
+            if flagname in c.flags:
                 living_cheated += 1
             if c.landed() and c.rank() > Rank.Barony:
                 living_rulers += 1
-                if "has_cheated_flag" in c.flags:
+                if flagname in c.flags:
                     living_rulers_cheated += 1
                 for child in c.child_ids:
                     if child in state.characters:
@@ -62,7 +65,7 @@ def main():
                 spouse = state.characters[c.primary_spouse_id]
                 if spouse.landed() and spouse.rank() > Rank.Barony:
                     living_ruler_spouses += 1
-                    if "has_cheated_flag" in c.flags:
+                    if flagname in c.flags:
                         living_ruler_spouses_cheated += 1
 
     for child_id in ruler_children_set:
@@ -72,7 +75,7 @@ def main():
         if c.age(state.date) < 16:
             continue
         living_ruler_children += 1
-        if "has_cheated_flag" in c.flags:
+        if flagname in c.flags:
             living_ruler_children_cheated += 1
 
     for c in state.characters.values():
@@ -87,9 +90,9 @@ def main():
         else:
             continue
         living_ruler_siblings += 1
-        if "has_cheated_flag" in c.flags:
+        if flagname in c.flags:
             living_ruler_siblings_cheated += 1
-        
+
     print("%d living" % living)
     print("%d living cheated" % living_cheated)
     print("%d living rulers" % living_rulers)
